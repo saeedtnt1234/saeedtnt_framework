@@ -1,0 +1,10 @@
+{
+    "name": "saeedtnt/framework",
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Core\\": "core/"
+        }
+    },
+    "require": {}
+}

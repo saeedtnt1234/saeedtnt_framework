@@ -1,0 +1,7 @@
+RewriteEngine On
+
+# همه درخواست‌ها به index.php بره مگر فایل یا فولدر وجود داشته باشه
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+RewriteRule ^ index.php [QSA,L]

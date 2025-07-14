@@ -1,0 +1,187 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/core/Autoload.php';
+
+\Core\Autoload::register();
+
+$argv = $_SERVER['argv'];
+$command = $argv[1] ?? null;
+$argument = $argv[2] ?? null;
+
+switch ($command) {
+        case 'make:controller':
+            if (!$argument) exit("نام کنترلر را وارد کنید.\n");
+            $name = ucfirst($argument);
+            $file = __DIR__ . "/app/Controllers/{$name}.php";
+            if (file_exists($file)) exit("کنترلر $name قبلاً ساخته شده.\n");
+
+            file_put_contents($file, <<<PHP
+    <?php
+
+    namespace App\Controllers;
+
+    use Core\Controller;
+
+    class {$name} extends Controller
+    {
+        public function index()
+        {
+            return "This is {$name}@index";
+        }
+    }
+
+    PHP);
+            echo "کنترلر $name با موفقیت ساخته شد.\n";
+            break;
+
+        case 'make:model':
+            if (!$argument) exit("نام مدل را وارد کنید.\n");
+            $name = ucfirst($argument);
+            $file = __DIR__ . "/app/Models/{$name}.php";
+            if (file_exists($file)) exit("مدل $name قبلاً ساخته شده.\n");
+
+            file_put_contents($file, <<<PHP
+    <?php
+
+    namespace App\Models;
+
+    use Core\Model;
+
+    class {$name} extends Model
+    {
+        protected static \$table = '{$argument}s';
+    }
+
+    PHP);
+            echo "مدل $name با موفقیت ساخته شد.\n";
+            break;
+
+        case 'make:view':
+            if (!$argument) exit("نام ویو را وارد کنید.\n");
+            $name = strtolower($argument);
+            $file = __DIR__ . "/app/Views/{$name}.saeedtnt.php";
+            if (file_exists($file)) exit("ویو $name قبلاً ساخته شده.\n");
+
+            file_put_contents($file, <<<HTML
+    <h1>View: {$name}</h1>
+    HTML);
+            echo "ویو $name ساخته شد.\n";
+            break;
+
+    case 'make:migration':
+    if (!$argument) exit("نام مایگریشن را وارد کنید.\n");
+
+    $fields = array_slice($argv, 3);
+    $timestamp = date('Ymd_His');
+    $filename = "{$timestamp}_{$argument}.php";
+    $filepath = __DIR__ . "/migrations/$filename";
+
+    if (file_exists($filepath)) {
+        exit("این مایگریشن قبلاً وجود دارد.\n");
+    }
+
+    $sqlFields = [];
+    $foreignKeys = [];
+
+    foreach ($fields as $field) {
+        $parts = explode(':', $field);
+        $name = $parts[0];
+        $type = $parts[1] ?? 'string';
+        $length = isset($parts[2]) && is_numeric($parts[2]) ? "({$parts[2]})" : '';
+
+        $extras = [];
+
+        // چک کردن بقیه پارامترها
+        foreach ($parts as $part) {
+            if (str_starts_with($part, 'default(')) {
+                $val = substr($part, 8, -1);
+                $extras[] = "DEFAULT '{$val}'";
+            }
+            if ($part === 'nullable') {
+                $extras[] = "NULL";
+            }
+            if ($part === 'unique') {
+                $extras[] = "UNIQUE";
+            }
+            // foreign key با مشخصات جدول و ستون مرجع
+            if (str_starts_with($part, 'foreign(')) {
+                $inside = substr($part, 7, -1); // داخل پرانتز: table,column
+                list($refTable, $refColumn) = explode(',', $inside);
+                $foreignKeys[] = "FOREIGN KEY (`$name`) REFERENCES $refTable($refColumn)";
+            }
+        }
+
+        $typeMap = [
+            'string' => 'VARCHAR',
+            'int' => 'INT',
+            'text' => 'TEXT',
+        ];
+
+        $sqlType = $typeMap[$type] ?? strtoupper($type);
+        $sqlLine = "`$name` $sqlType$length " . implode(' ', $extras);
+        $sqlFields[] = $sqlLine;
+    }
+
+    array_unshift($sqlFields, "`id` INT AUTO_INCREMENT PRIMARY KEY");
+    $sqlFields[] = "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP";
+
+    // اضافه کردن foreign keys بعد از ستون‌ها
+    $allSql = implode(",\n    ", $sqlFields);
+    if (!empty($foreignKeys)) {
+        $allSql .= ",\n    " . implode(",\n    ", $foreignKeys);
+    }
+
+    $tableName = preg_replace('/^create_/', '', $argument);
+
+    file_put_contents($filepath, <<<PHP
+<?php
+
+use Core\Database;
+
+require_once __DIR__ . '/../core/Autoload.php';
+\Core\Autoload::register();
+\$config = require __DIR__ . '/../config/database.php';
+Database::connect(\$config);
+\$conn = Database::getConnection();
+
+\$conn->exec("
+    CREATE TABLE IF NOT EXISTS $tableName (
+        $allSql
+    );
+");
+
+echo "✅ مایگریشن '$argument' اجرا شد.\n";
+PHP);
+
+    echo "مایگریشن $argument ساخته شد در: $filename\n";
+    break;
+
+
+    case 'migrate':
+        echo "اجرای مایگریشن‌ها...\n";
+
+        $migrationsDir = __DIR__ . '/migrations/';
+        $files = glob($migrationsDir . '*.php');
+
+        if (!$files) {
+            echo "هیچ مایگریشنی یافت نشد.\n";
+            break;
+        }
+
+        foreach ($files as $file) {
+            echo "اجرای فایل: " . basename($file) . "\n";
+            require $file;
+        }
+
+        echo "✅ همه مایگریشن‌ها اجرا شدند.\n";
+        break;
+
+    default:
+        echo "دستور نامعتبر است. دستورات ممکن:\n";
+        echo "  make:controller Name\n";
+        echo "  make:model Name\n";
+        echo "  make:view name\n";
+        echo "  make:migration name\n";
+        break;
+}
