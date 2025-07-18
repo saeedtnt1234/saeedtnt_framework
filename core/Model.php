@@ -36,6 +36,22 @@ class Model
         $stmt->execute(array_values($data));
         return Database::getConnection()->lastInsertId();
     }
+    public static function update($id, $data)
+    {
+        $fields = array_map(function ($key) {
+            return "$key = ?";
+        }, array_keys($data));
 
-    // متدهای دیگر: update، delete و ... را هم می‌تونیم اضافه کنیم
+        $fieldsString = implode(', ', $fields);
+        $values = array_values($data);
+        $values[] = $id;
+
+        $stmt = Database::getConnection()->prepare("UPDATE " . static::table() . " SET $fieldsString WHERE id = ?");
+        return $stmt->execute($values);
+    }
+    public static function delete($id)
+    {
+        $stmt = Database::getConnection()->prepare("DELETE FROM " . static::table() . " WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
 }
